@@ -30,18 +30,24 @@ collection = client.get_or_create_collection(
 @app.get("/ask")
 def ask(question: str, user: str = None):
     
-    query_params = collection.query(
-        query_texts=[question], #Chroma db converts this in vector
-        n_results = 2
-    )
+    # Prepare the query parameters
+    query_args = {
+        "query_texts": [question],
+        "n_results": 2
+    }
 
+    # Add filter if user is provided
     if user:
-        query_params["where"] = {"username": user}
+        query_args["where"] = {"username": user}
 
+    # Execute the query once
+    result = collection.query(**query_args)
 
-    result = collection.query(**query_params)
     # Combine the matching chunks into a single string
-    context = "\n\n".join(result["documents"][0])
+    if not result["documents"] or not result["documents"][0]:
+        context = "No relevant context found."
+    else:
+        context = "\n\n".join(result["documents"][0])
 
     # Step 2: AUGMENT - build a prompt that includes the retrieved context
     augmented_prompt = f"""Use the following context to answer the question.
