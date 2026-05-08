@@ -14,7 +14,7 @@ app = FastAPI(title="RAG App with Chroma DB")
 # Save data to disk so it survives restarts
 client = chromadb.PersistentClient(path="./chroma_db")
 
-# Connect to Ollama's embedding model to convert text into vectors
+  # Connect to Ollama's embedding model to convert text into vectors
 ef = OllamaEmbeddingFunction(
     model_name="nomic-embed-text",
     url="http://localhost:11434",  # Ollama's default local address
@@ -60,7 +60,7 @@ def ask(question: str, user: str = None):
 
     #Step3: send the augmented question to local LLM
     response = ollama.chat(
-        model="gpt-oss:120b-cloud",
+        model="tinyllama:latest",
         messages=[{"role":"user", "content":augmented_prompt}]
     )
 
@@ -68,7 +68,8 @@ def ask(question: str, user: str = None):
         "question": question,
         "answer": response["message"]["content"],
         "context_used": result["documents"][0],
-        "filtered_by_user": user
+        "filtered_by_user": user,
+        "model_used": response.model
     }
 
 #Endpoint to upload text file
