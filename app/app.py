@@ -8,6 +8,8 @@ from chromadb.utils.embedding_functions.ollama_embedding_function import (
     OllamaEmbeddingFunction
 )
 from app.schema import DocumentSubmission
+import os
+
 
 app = FastAPI(title="RAG App with Chroma DB")
 
@@ -15,13 +17,15 @@ app = FastAPI(title="RAG App with Chroma DB")
 client = chromadb.PersistentClient(path="./chroma_db")
 
 # Initialize Ollama client for chat
-ollama_client = ollama.Client(host="http://host.docker.internal:11434")
+ollama_host = os.getenv("OLLAMA_HOST", "http://host.docker.internal:11434")
+ollama_client = ollama.Client(host=ollama_host)
 
   # Connect to Ollama's embedding model to convert text into vectors
 ef = OllamaEmbeddingFunction(
     model_name="nomic-embed-text",
-    url="http://host.docker.internal:11434",  # Ollama's default local address
+    url=ollama_host,  # Ollama's address (service name in docker-compose)
 )
+
 
 # Create (or reuse) a collection - like a table in a database
 collection = client.get_or_create_collection(
@@ -32,7 +36,7 @@ collection = client.get_or_create_collection(
 
 @app.get("/ask")
 def ask(question: str, user: str = None):
-    
+
     # Prepare the query parameters
     query_args = {
         "query_texts": [question],
@@ -46,38 +50,40 @@ def ask(question: str, user: str = None):
     # Execute the query once
     result = collection.query(**query_args)
 
+    # Safe access to matched chunks (guards against empty collection)
+    context_chunks = result["documents"][0] if result["documents"] else []
+
     # Combine the matching chunks into a single string
-    if not result["documents"] or not result["documents"][0]:
+    if not context_chunks:
         context = "No relevant context found."
     else:
-        context = "\n\n".join(result["documents"][0])
+        context = "\n\n".join(context_chunks)
 
     # Step 2: AUGMENT - build a prompt that includes the retrieved context
-    augmented_prompt = f"""Use the following context to answer the question.
-        If the context doesn't contain relevant information, say so.
+    augmented_prompt = (
+        f"Use the following context to answer the question.\n"
+        f"If the context doesn't contain relevant information, say so.\n\n"
+        f"Context:\n{context}\n\n"
+        f"Question: {question}"
+    )
 
-        Context:
-        {context}
-
-        Question: {question}"""
-
-    #Step3: send the augmented question to local LLM
+    # Step 3: send the augmented question to local LLM
     response = ollama_client.chat(
-        model="tinyllama:latest",
-        messages=[{"role":"user", "content":augmented_prompt}]
+        model="llama3.2:1b",
+        messages=[{"role": "user", "content": augmented_prompt}]
     )
 
     return {
         "question": question,
-        "answer": response["message"]["content"],
-        "context_used": result["documents"][0],
+        "answer": response.message.content,
+        "context_used": context_chunks,
         "filtered_by_user": user,
         "model_used": response.model
     }
 
 #Endpoint to upload text file
 @app.post("/upload-pdf")
-async def upload_pdf(file: UploadFile = File(...)):
+async def upload_pdf(username : str, file: UploadFile = File(...)):
     # Read PDF
     pdf_content = await file.read()
     pdf_reader = PyPDF2.PdfReader(io.BytesIO(pdf_content))
@@ -92,13 +98,22 @@ async def upload_pdf(file: UploadFile = File(...)):
         return {"error": "No text found in PDF"}
 
     # Simple chunking (1000 chars)
-    chunks = [text[i:i+1000] for i in range(0, len(text), 1000)]
-    ids = [f"{file.filename}_{uuid.uuid4()}" for _ in chunks]
+    chunks = [text[i:i+500] for i in range(0, len(text), 500)]
     
     # Add to ChromaDB
-    collection.add(documents=chunks, ids=ids)
+    collection.add(
+        ids = [f"{username} - chunk{i}" for i in range(len(chunks))],
+        documents = chunks,
+        metadatas = [
+            {"source" : "profile", "username" : username, "chunk_idx": i}
+            for i in range(len(chunks))
+        ])
     
-    return {"message": f"Added {len(chunks)} chunks from {file.filename}"}
+    return {
+        "message": f"Added {len(chunks)} chunks for user '{username}'",
+        "username": username,
+        "chunks_added": len(chunks)
+    }
 
 
 #Post endpoint for User data Ingestion
