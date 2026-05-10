@@ -14,10 +14,13 @@ app = FastAPI(title="RAG App with Chroma DB")
 # Save data to disk so it survives restarts
 client = chromadb.PersistentClient(path="./chroma_db")
 
+# Initialize Ollama client for chat
+ollama_client = ollama.Client(host="http://host.docker.internal:11434")
+
   # Connect to Ollama's embedding model to convert text into vectors
 ef = OllamaEmbeddingFunction(
     model_name="nomic-embed-text",
-    url="http://localhost:11434",  # Ollama's default local address
+    url="http://host.docker.internal:11434",  # Ollama's default local address
 )
 
 # Create (or reuse) a collection - like a table in a database
@@ -59,7 +62,7 @@ def ask(question: str, user: str = None):
         Question: {question}"""
 
     #Step3: send the augmented question to local LLM
-    response = ollama.chat(
+    response = ollama_client.chat(
         model="tinyllama:latest",
         messages=[{"role":"user", "content":augmented_prompt}]
     )
