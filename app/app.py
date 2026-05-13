@@ -53,6 +53,10 @@ collection = client.get_or_create_collection(
 @app.get("/ask")
 def ask(question: str, user: str = None):
 
+    # Normalize username to lowercase for consistent matching
+    if user:
+        user = user.strip().lower()
+
     # If a user filter is provided, verify the user exists in the collection
     if user:
         user_check = collection.get(where={"username": user})
@@ -110,6 +114,9 @@ def ask(question: str, user: str = None):
 #Endpoint to upload text file
 @app.post("/upload-pdf")
 async def upload_pdf(username : str, file: UploadFile = File(...)):
+    # Normalize username to lowercase for consistent matching
+    username = username.strip().lower()
+
     # Read PDF
     pdf_content = await file.read()
     pdf_reader = PyPDF2.PdfReader(io.BytesIO(pdf_content))
@@ -123,7 +130,7 @@ async def upload_pdf(username : str, file: UploadFile = File(...)):
     if not text.strip():
         return {"error": "No text found in PDF"}
 
-    # Simple chunking (1000 chars)
+    # Simple chunking (500 chars)
     chunks = [text[i:i+500] for i in range(0, len(text), 500)]
     
     # Add to ChromaDB
@@ -145,41 +152,45 @@ async def upload_pdf(username : str, file: UploadFile = File(...)):
 #Post endpoint for User data Ingestion
 @app.post("/user_documents")
 def add_user_document(submission: DocumentSubmission):
+    # Normalize username to lowercase for consistent matching
+    username = submission.username.strip().lower()
 
     chunks = [chunk.strip() for chunk in submission.content.split("\n\n") if chunk.split()]
 
     #Store chunks in the database
     collection.add(
-        ids=[f"{submission.username} - chunk{i}" for i in range(len(chunks))],
+        ids=[f"{username} - chunk{i}" for i in range(len(chunks))],
         documents= chunks,
         metadatas= [
-            {"source" : "profile", "username" : submission.username, "chunk_idx": i}
+            {"source" : "profile", "username" : username, "chunk_idx": i}
             for i in range(len(chunks))
         ]
     )
 
     return {
-        "message": f"Added {len(chunks)} chunks for user '{submission.username}'",
-        "username": submission.username,
+        "message": f"Added {len(chunks)} chunks for user '{username}'",
+        "username": username,
         "chunks_added": len(chunks)
     }
 
 #Delete user Database
 @app.delete("/user_documents/{username}")
 def delete_user_documents(username : str):
+    # Normalize username to lowercase for consistent matching
+    username = username.strip().lower()
 
-    #If user already exists in database then 
-    if username in collection.get(where={"username": username})["ids"]:
+    # Check if user has any documents before deleting
+    user_docs = collection.get(where={"username": username})
+    if user_docs["ids"]:
         collection.delete(where={"username": username})
         return {
             "message": f"Deleted all documents for user '{username}'",
             "username": username,
             "chunks_deleted": "all"
-    }
+        }
     else:
-        return {
-            "message": f"No documents found for user '{username}'",
-            "username": username,
-            "chunks_deleted": "none"
-    }
+        raise HTTPException(
+            status_code=404,
+            detail=f"No documents found for user '{username}'"
+        )
 

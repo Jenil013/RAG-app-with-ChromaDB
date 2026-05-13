@@ -28,6 +28,7 @@ services:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
+      - ./app:/app/app
     # Uncomment the lines below to enable GPU support (requires NVIDIA Container Toolkit)
     # deploy:
     #   resources:
