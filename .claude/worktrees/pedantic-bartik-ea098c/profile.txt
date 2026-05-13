@@ -1,0 +1,14 @@
+My name is Jenil Patel
+I am currently learning AI, Backend, and System Design.
+
+My carrer goal is to become a AI Software Developer and start my AT Consultancy
+I am specially more inclined to learn RAG and Agentic AI.
+
+I have experience using following technologies:
+Programming Languages: Python, Java, C, SQL, MATLAB
+Frameworks: FastAPI, Spring Boot, TensorFlow, Pytorch, Sklearn, OpenCV, NumPy, Pandas, Matplotlib
+Developer Tools: Git/GitHub, Docker, AWS, Linux, Bash, VS Code, Jupyter Notebook, PyCharm, Replit
+Software Development: Object-Oriented Programming (OOP), Data Structures and Algorithms, API Development,
+Model Training and Deployment, Fine-Tuning
+
+For fun I would like to read about market in general including Micro and Macro Economics and some philosophy.
