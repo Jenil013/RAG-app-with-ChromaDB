@@ -13,6 +13,14 @@ services:
     depends_on:
       - ollama
 
+  frontend:
+    container_name: rag-frontend
+    build: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - app
+
   ollama:
     container_name: ollama
     image: ollama/ollama:latest
@@ -20,6 +28,7 @@ services:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
+      - ./app:/app/app
     # Uncomment the lines below to enable GPU support (requires NVIDIA Container Toolkit)
     # deploy:
     #   resources:
