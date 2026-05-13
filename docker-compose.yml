@@ -13,6 +13,14 @@ services:
     depends_on:
       - ollama
 
+  frontend:
+    container_name: rag-frontend
+    build: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - app
+
   ollama:
     container_name: ollama
     image: ollama/ollama:latest

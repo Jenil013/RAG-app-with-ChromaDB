@@ -1,4 +1,5 @@
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 import ollama
 import chromadb
 import PyPDF2
@@ -13,17 +14,32 @@ import os
 
 app = FastAPI(title="RAG App with Chroma DB")
 
+# Allow requests from the frontend container and local dev
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",   # Docker frontend
+        "http://localhost:5500",   # VS Code Live Server
+        "http://127.0.0.1:5500",
+        "http://localhost:8080",
+        "*",                       # Remove in production
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Save data to disk so it survives restarts
 client = chromadb.PersistentClient(path="./chroma_db")
 
 # Initialize Ollama client for chat
 ollama_host = os.getenv("OLLAMA_HOST", "http://host.docker.internal:11434")
-ollama_client = ollama.Client(host=ollama_host)
+ollama_client = ollama.Client(host="http://host.docker.internal:11434")
 
-  # Connect to Ollama's embedding model to convert text into vectors
+# Connect to Ollama's embedding model to convert text into vectors
 ef = OllamaEmbeddingFunction(
     model_name="nomic-embed-text",
-    url=ollama_host,  # Ollama's address (service name in docker-compose)
+    url="http://host.docker.internal:11434",  # Ollama's address (service name in docker-compose)
 )
 
 
@@ -36,6 +52,15 @@ collection = client.get_or_create_collection(
 
 @app.get("/ask")
 def ask(question: str, user: str = None):
+
+    # If a user filter is provided, verify the user exists in the collection
+    if user:
+        user_check = collection.get(where={"username": user})
+        if not user_check["ids"]:
+            raise HTTPException(
+                status_code=404,
+                detail=f"User '{user}' not found. No documents have been indexed for this user."
+            )
 
     # Prepare the query parameters
     query_args = {
@@ -80,6 +105,7 @@ def ask(question: str, user: str = None):
         "filtered_by_user": user,
         "model_used": response.model
     }
+
 
 #Endpoint to upload text file
 @app.post("/upload-pdf")
@@ -137,3 +163,23 @@ def add_user_document(submission: DocumentSubmission):
         "username": submission.username,
         "chunks_added": len(chunks)
     }
+
+#Delete user Database
+@app.delete("/user_documents/{username}")
+def delete_user_documents(username : str):
+
+    #If user already exists in database then 
+    if username in collection.get(where={"username": username})["ids"]:
+        collection.delete(where={"username": username})
+        return {
+            "message": f"Deleted all documents for user '{username}'",
+            "username": username,
+            "chunks_deleted": "all"
+    }
+    else:
+        return {
+            "message": f"No documents found for user '{username}'",
+            "username": username,
+            "chunks_deleted": "none"
+    }
+

@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RAG Assistant – Powered by Ollama & ChromaDB</title>
+  <meta name="description" content="A personal AI assistant powered by Retrieval-Augmented Generation using ChromaDB and Ollama LLM." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Background Orbs -->
+  <div class="bg-orb orb-1"></div>
+  <div class="bg-orb orb-2"></div>
+  <div class="bg-orb orb-3"></div>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-inner">
+      <div class="logo">
+        <div class="logo-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
+          </svg>
+        </div>
+        <span class="logo-text">RAG <span class="logo-accent">Assistant</span></span>
+      </div>
+      <div class="header-meta">
+        <div class="status-badge" id="statusBadge">
+          <span class="status-dot"></span>
+          <span class="status-label">Connecting…</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Layout -->
+  <main class="main-layout">
+
+    <!-- Sidebar / Nav Tabs -->
+    <nav class="sidebar">
+      <button class="nav-tab active" data-tab="ask" id="tab-ask">
+        <span class="nav-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+        </span>
+        <span>Ask AI</span>
+      </button>
+      <button class="nav-tab" data-tab="upload-pdf" id="tab-upload-pdf">
+        <span class="nav-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>
+          </svg>
+        </span>
+        <span>Upload PDF</span>
+      </button>
+      <button class="nav-tab" data-tab="add-text" id="tab-add-text">
+        <span class="nav-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+        </span>
+        <span>Add Document</span>
+      </button>
+      <button class="nav-tab" data-tab="delete" id="tab-delete">
+        <span class="nav-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
+          </svg>
+        </span>
+        <span>Delete Data</span>
+      </button>
+    </nav>
+
+    <!-- Content Area -->
+    <div class="content-area">
+
+      <!-- ───── ASK TAB ───── -->
+      <section class="tab-panel active" id="panel-ask">
+        <div class="panel-header">
+          <h1 class="panel-title">Ask the AI</h1>
+          <p class="panel-subtitle">Query your knowledge base using Retrieval-Augmented Generation</p>
+        </div>
+
+        <div class="ask-container">
+          <div class="chat-window" id="chatWindow">
+            <div class="chat-empty" id="chatEmpty">
+              <div class="chat-empty-icon">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+              </div>
+              <p>Ask anything about your uploaded documents</p>
+            </div>
+          </div>
+
+          <div class="ask-form-wrap">
+            <div class="input-row">
+              <div class="input-group">
+                <label for="askUser" class="input-label">Filter by User <span class="label-optional">(optional)</span></label>
+                <input type="text" id="askUser" class="input-field" placeholder="e.g. jenil" />
+              </div>
+            </div>
+            <div class="question-row">
+              <textarea
+                id="askQuestion"
+                class="textarea-field"
+                placeholder="Type your question here…"
+                rows="3"
+              ></textarea>
+              <button class="btn-primary send-btn" id="askBtn" onclick="handleAsk()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                </svg>
+                <span>Send</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ───── UPLOAD PDF TAB ───── -->
+      <section class="tab-panel" id="panel-upload-pdf">
+        <div class="panel-header">
+          <h1 class="panel-title">Upload PDF</h1>
+          <p class="panel-subtitle">Extract and index PDF content into your knowledge base</p>
+        </div>
+
+        <div class="card">
+          <div class="form-group">
+            <label for="pdfUsername" class="input-label">Username <span class="label-required">*</span></label>
+            <input type="text" id="pdfUsername" class="input-field" placeholder="Enter username" />
+          </div>
+
+          <div class="dropzone" id="dropzone" onclick="document.getElementById('pdfFile').click()">
+            <div class="dropzone-icon">
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+            </div>
+            <p class="dropzone-text">Click to browse or drag & drop</p>
+            <p class="dropzone-hint">PDF files only</p>
+            <input type="file" id="pdfFile" accept=".pdf" hidden onchange="handleFileSelect(event)" />
+          </div>
+          <div class="file-selected" id="fileSelected" style="display:none;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+            </svg>
+            <span id="fileSelectedName"></span>
+          </div>
+
+          <button class="btn-primary" id="uploadPdfBtn" onclick="handlePdfUpload()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            Upload PDF
+          </button>
+
+          <div class="result-box" id="pdfResult" style="display:none;"></div>
+        </div>
+      </section>
+
+      <!-- ───── ADD TEXT TAB ───── -->
+      <section class="tab-panel" id="panel-add-text">
+        <div class="panel-header">
+          <h1 class="panel-title">Add Document</h1>
+          <p class="panel-subtitle">Directly add text content for a specific user to the knowledge base</p>
+        </div>
+
+        <div class="card">
+          <div class="form-group">
+            <label for="docUsername" class="input-label">Username <span class="label-required">*</span></label>
+            <input type="text" id="docUsername" class="input-field" placeholder="Enter username" />
+          </div>
+          <div class="form-group">
+            <label for="docContent" class="input-label">Document Content <span class="label-required">*</span></label>
+            <textarea
+              id="docContent"
+              class="textarea-field"
+              placeholder="Paste your document text here. Paragraphs separated by blank lines will be chunked automatically…"
+              rows="10"
+            ></textarea>
+          </div>
+
+          <button class="btn-primary" id="addDocBtn" onclick="handleAddDocument()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            Add to Knowledge Base
+          </button>
+
+          <div class="result-box" id="docResult" style="display:none;"></div>
+        </div>
+      </section>
+
+      <!-- ───── DELETE TAB ───── -->
+      <section class="tab-panel" id="panel-delete">
+        <div class="panel-header">
+          <h1 class="panel-title">Delete User Data</h1>
+          <p class="panel-subtitle">Permanently remove all documents associated with a user</p>
+        </div>
+
+        <div class="card">
+          <div class="danger-banner">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            <span>This action is irreversible. All vector embeddings for the user will be deleted.</span>
+          </div>
+
+          <div class="form-group">
+            <label for="deleteUsername" class="input-label">Username <span class="label-required">*</span></label>
+            <input type="text" id="deleteUsername" class="input-field" placeholder="Enter username to delete" />
+          </div>
+
+          <button class="btn-danger" id="deleteBtn" onclick="handleDelete()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/>
+            </svg>
+            Delete All Documents
+          </button>
+
+          <div class="result-box" id="deleteResult" style="display:none;"></div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
