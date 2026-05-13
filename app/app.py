@@ -1,4 +1,5 @@
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 import ollama
 import chromadb
 import PyPDF2
@@ -13,17 +14,32 @@ import os
 
 app = FastAPI(title="RAG App with Chroma DB")
 
+# Allow requests from the frontend container and local dev
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",   # Docker frontend
+        "http://localhost:5500",   # VS Code Live Server
+        "http://127.0.0.1:5500",
+        "http://localhost:8080",
+        "*",                       # Remove in production
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Save data to disk so it survives restarts
 client = chromadb.PersistentClient(path="./chroma_db")
 
 # Initialize Ollama client for chat
 ollama_host = os.getenv("OLLAMA_HOST", "http://host.docker.internal:11434")
-ollama_client = ollama.Client(host=ollama_host)
+ollama_client = ollama.Client(host="http://host.docker.internal:11434")
 
-  # Connect to Ollama's embedding model to convert text into vectors
+# Connect to Ollama's embedding model to convert text into vectors
 ef = OllamaEmbeddingFunction(
     model_name="nomic-embed-text",
-    url=ollama_host,  # Ollama's address (service name in docker-compose)
+    url="http://host.docker.internal:11434",  # Ollama's address (service name in docker-compose)
 )
 
 
@@ -36,6 +52,19 @@ collection = client.get_or_create_collection(
 
 @app.get("/ask")
 def ask(question: str, user: str = None):
+
+    # Normalize username to lowercase for consistent matching
+    if user:
+        user = user.strip().lower()
+
+    # If a user filter is provided, verify the user exists in the collection
+    if user:
+        user_check = collection.get(where={"username": user})
+        if not user_check["ids"]:
+            raise HTTPException(
+                status_code=404,
+                detail=f"User '{user}' not found. No documents have been indexed for this user."
+            )
 
     # Prepare the query parameters
     query_args = {
@@ -81,9 +110,13 @@ def ask(question: str, user: str = None):
         "model_used": response.model
     }
 
+
 #Endpoint to upload text file
 @app.post("/upload-pdf")
 async def upload_pdf(username : str, file: UploadFile = File(...)):
+    # Normalize username to lowercase for consistent matching
+    username = username.strip().lower()
+
     # Read PDF
     pdf_content = await file.read()
     pdf_reader = PyPDF2.PdfReader(io.BytesIO(pdf_content))
@@ -97,7 +130,7 @@ async def upload_pdf(username : str, file: UploadFile = File(...)):
     if not text.strip():
         return {"error": "No text found in PDF"}
 
-    # Simple chunking (1000 chars)
+    # Simple chunking (500 chars)
     chunks = [text[i:i+500] for i in range(0, len(text), 500)]
     
     # Add to ChromaDB
@@ -119,21 +152,45 @@ async def upload_pdf(username : str, file: UploadFile = File(...)):
 #Post endpoint for User data Ingestion
 @app.post("/user_documents")
 def add_user_document(submission: DocumentSubmission):
+    # Normalize username to lowercase for consistent matching
+    username = submission.username.strip().lower()
 
     chunks = [chunk.strip() for chunk in submission.content.split("\n\n") if chunk.split()]
 
     #Store chunks in the database
     collection.add(
-        ids=[f"{submission.username} - chunk{i}" for i in range(len(chunks))],
+        ids=[f"{username} - chunk{i}" for i in range(len(chunks))],
         documents= chunks,
         metadatas= [
-            {"source" : "profile", "username" : submission.username, "chunk_idx": i}
+            {"source" : "profile", "username" : username, "chunk_idx": i}
             for i in range(len(chunks))
         ]
     )
 
     return {
-        "message": f"Added {len(chunks)} chunks for user '{submission.username}'",
-        "username": submission.username,
+        "message": f"Added {len(chunks)} chunks for user '{username}'",
+        "username": username,
         "chunks_added": len(chunks)
     }
+
+#Delete user Database
+@app.delete("/user_documents/{username}")
+def delete_user_documents(username : str):
+    # Normalize username to lowercase for consistent matching
+    username = username.strip().lower()
+
+    # Check if user has any documents before deleting
+    user_docs = collection.get(where={"username": username})
+    if user_docs["ids"]:
+        collection.delete(where={"username": username})
+        return {
+            "message": f"Deleted all documents for user '{username}'",
+            "username": username,
+            "chunks_deleted": "all"
+        }
+    else:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No documents found for user '{username}'"
+        )
+
