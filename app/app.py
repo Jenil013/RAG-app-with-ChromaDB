@@ -33,13 +33,13 @@ app.add_middleware(
 client = chromadb.PersistentClient(path="./chroma_db")
 
 # Initialize Ollama client for chat
-ollama_host = os.getenv("OLLAMA_HOST", "http://host.docker.internal:11434")
-ollama_client = ollama.Client(host="http://host.docker.internal:11434")
+ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+ollama_client = ollama.Client(host=ollama_host)
 
 # Connect to Ollama's embedding model to convert text into vectors
 ef = OllamaEmbeddingFunction(
     model_name="nomic-embed-text",
-    url="http://host.docker.internal:11434",  # Ollama's address (service name in docker-compose)
+    url=ollama_host
 )
 
 

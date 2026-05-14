@@ -1,0 +1,114 @@
+# ─────────────────────────────────────────────
+# Ollama Deployment + Service
+# ─────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ollama
+  template:
+    metadata:
+      labels:
+        app: ollama
+    spec:
+      containers:
+      - name: ollama-container
+        image: ollama/ollama:latest
+        imagePullPolicy: IfNotPresent   # Pull from Docker Hub if not cached locally
+        ports:
+        - containerPort: 11434
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama-service
+spec:
+  selector:
+    app: ollama
+  ports:
+  - port: 11434
+    targetPort: 11434
+
+---
+# ─────────────────────────────────────────────
+# FastAPI Backend Deployment + Service
+# ─────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rag-app-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rag-api
+  template:
+    metadata:
+      labels:
+        app: rag-api
+    spec:
+      containers:
+      - name: rag-api-container
+        image: rag-api-project-app:latest
+        imagePullPolicy: Never          # Use image loaded into Minikube's Docker daemon
+        ports:
+        - containerPort: 8000
+        env:
+        - name: OLLAMA_HOST
+          value: "http://ollama-service:11434"   # K8s service DNS name
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rag-api-service
+spec:
+  selector:
+    app: rag-api
+  ports:
+  - port: 8000
+    targetPort: 8000
+
+---
+# ─────────────────────────────────────────────
+# Frontend Deployment + NodePort Service
+# ─────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rag-frontend-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rag-frontend
+  template:
+    metadata:
+      labels:
+        app: rag-frontend
+    spec:
+      containers:
+      - name: rag-frontend-container
+        image: rag-api-project-frontend:latest
+        imagePullPolicy: Never          # Use image loaded into Minikube's Docker daemon
+        ports:
+        - containerPort: 80             # Nginx serves on port 80, NOT 3000
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rag-frontend-service
+spec:
+  type: NodePort                        # Exposes the app via minikube ip + nodePort
+  selector:
+    app: rag-frontend
+  ports:
+  - port: 80
+    targetPort: 80
+    nodePort: 30080                     # Access at: http://<minikube ip>:30080

@@ -5,9 +5,9 @@
    When running locally without Docker, set BASE_URL = "http://localhost:8000"
 ───────────────────────────────────────────────────────────── */
 
-const BASE_URL = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
-  ? "http://localhost:8000"   // local dev
-  : "/api";                   // Docker (nginx proxies /api -> backend)
+const BASE_URL = window.location.port === "5500" || window.location.protocol === "file:"
+  ? "http://localhost:8000"   // local dev (VS Code Live Server)
+  : "/api";                   // Docker / Kubernetes (nginx proxies /api -> backend)
 
 /* ──────────────────────────────────────
    TAB SWITCHING

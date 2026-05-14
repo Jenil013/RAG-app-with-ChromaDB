@@ -1,0 +1,17 @@
+1. Fired up minikube and kubectl
+    - docker daemon for minikube: minikube -p minikube docker-env --shell powershell | Invoke-Expression
+
+2. Built Docker images:
+   - `docker build -t rag-api-project-frontend:latest ./frontend`
+   - `docker build -t rag-api-project-app:latest .`
+   - `docker pull ollama/ollama:latest`
+
+3. Applied deployment:
+   - `kubectl apply -f deployment.yml`
+
+4. Check all the pods if they are running and have ready status 1/1
+   - `kubectl get all`
+   - If not running use : `kubectl rollout restart deployment <deployment_name>`
+
+5. Found the service endpoint:
+   - `minikube service rag-frontend-service --url` --> `http://[IP_ADDRESS]`
